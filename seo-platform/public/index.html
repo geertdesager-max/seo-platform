@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SEO Platform</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  color-scheme: light;
+  --navy:  #1F3864;
+  --blue:  #2E5496;
+  --bluel: #DCE6F1;
+  --grn:   #375623;
+  --grnl:  #E2EFDA;
+  --org:   #974706;
+  --orgl:  #FCE4D6;
+  --red:   #9C0006;
+  --redl:  #FFC7CE;
+  --bg:    #eef2f7;
+  --card:  #ffffff;
+  --text:  #1a1a2e;
+  --muted: #888;
+  --border:#e8ecf0;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 13px; }
+
+/* ── Auth screen ── */
+#auth-screen {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 100%);
+}
+.auth-box {
+  background: white; border-radius: 12px; padding: 40px 36px; width: 360px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.auth-box h1 { font-size: 22px; color: var(--navy); margin-bottom: 6px; }
+.auth-box p  { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+.auth-box input {
+  width: 100%; padding: 10px 14px; border: 1px solid var(--border);
+  border-radius: 6px; font-size: 14px; margin-bottom: 12px; outline: none;
+}
+.auth-box input:focus { border-color: var(--blue); }
+.btn-primary {
+  width: 100%; padding: 11px; background: var(--navy); color: white;
+  border: none; border-radius: 6px; font-size: 14px; cursor: pointer; font-family: Arial;
+}
+.btn-primary:hover { background: var(--blue); }
+.auth-msg { font-size: 12px; margin-top: 12px; text-align: center; }
+.auth-msg.ok  { color: var(--grn); }
+.auth-msg.err { color: var(--red); }
+
+/* ── App layout ── */
+#app { display: none; }
+.topbar {
+  background: var(--navy); color: white; padding: 0 20px;
+  display: flex; align-items: center; height: 52px; gap: 16px;
+  position: sticky; top: 0; z-index: 100;
+}
+.topbar h1 { font-size: 15px; white-space: nowrap; }
+.site-select {
+  background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.25);
+  padding: 5px 10px; border-radius: 5px; font-size: 13px; font-family: Arial; cursor: pointer;
+  min-width: 180px;
+}
+.site-select option { background: var(--navy); }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.topbar-updated { font-size: 11px; opacity: 0.6; }
+.btn-sm {
+  background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.25);
+  padding: 5px 12px; border-radius: 5px; font-size: 12px; cursor: pointer; font-family: Arial;
+}
+.btn-sm:hover { background: rgba(255,255,255,0.25); }
+.btn-sm:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Tab nav ── */
+.tabnav {
+  background: white; border-bottom: 1px solid var(--border);
+  padding: 0 20px; display: flex; gap: 0;
+}
+.tab {
+  padding: 12px 18px; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent;
+  color: var(--muted); user-select: none;
+}
+.tab.active { color: var(--navy); border-bottom-color: var(--blue); font-weight: bold; }
+.tab:hover  { color: var(--navy); }
+
+/* ── Main content ── */
+.content { padding: 18px 20px; max-width: 1140px; margin: 0 auto; }
+.page { display: none; }
+.page.active { display: block; }
+
+/* ── KPI cards ── */
+.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+.kpi-card {
+  background: var(--card); border-radius: 8px; padding: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07); border-top: 3px solid var(--blue);
+}
+.kpi-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px; }
+.kpi-value { font-size: 26px; font-weight: bold; line-height: 1; color: var(--navy); }
+.kpi-sub   { font-size: 10px; color: #bbb; margin-top: 5px; }
+.kpi-trend { font-size: 11px; font-weight: bold; margin-top: 7px; }
+.up  { color: var(--grn); } .dn { color: var(--red); } .fl { color: var(--muted); }
+
+/* ── Two-col layout ── */
+.row2 { display: grid; grid-template-columns: 3fr 2fr; gap: 14px; margin-bottom: 14px; }
+
+/* ── Cards ── */
+.card {
+  background: var(--card); border-radius: 8px; padding: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+}
+.card h3 {
+  font-size: 12px; font-weight: bold; color: var(--navy);
+  margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+
+/* ── Tables ── */
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+thead th {
+  background: var(--navy); color: white; padding: 7px 10px;
+  text-align: left; font-weight: normal; font-size: 11px;
+}
+tbody tr:nth-child(even) { background: #f8f9fc; }
+tbody tr:hover { background: var(--bluel); }
+tbody td { padding: 7px 10px; border-bottom: 1px solid #f2f2f2; }
+
+/* ── Badges ── */
+.badge {
+  display: inline-block; padding: 2px 7px; border-radius: 3px;
+  font-weight: bold; font-size: 11px;
+}
+.badge-g { background: var(--grnl); color: var(--grn); }
+.badge-o { background: var(--orgl); color: var(--org); }
+.badge-r { background: var(--redl); color: var(--red); }
+.badge-b { background: var(--bluel); color: var(--blue); }
+
+/* ── Change requests ── */
+.change-card {
+  border: 1px solid var(--border); border-radius: 6px; padding: 14px;
+  margin-bottom: 10px; background: white;
+}
+.change-card.pending  { border-left: 3px solid #f0ad00; }
+.change-card.approved { border-left: 3px solid var(--grn); }
+.change-card.rejected { border-left: 3px solid var(--red); }
+.change-card.applied  { border-left: 3px solid var(--blue); }
+.change-meta { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+.change-field { font-weight: bold; font-size: 12px; margin-bottom: 4px; color: var(--navy); }
+.change-diff {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  margin: 8px 0; font-size: 12px;
+}
+.diff-old { background: #fff5f5; padding: 6px 8px; border-radius: 4px; color: #666; }
+.diff-new { background: #f0fff4; padding: 6px 8px; border-radius: 4px; }
+.diff-label { font-size: 10px; color: var(--muted); margin-bottom: 3px; }
+.change-actions { display: flex; gap: 8px; margin-top: 10px; }
+.btn-approve {
+  padding: 5px 14px; background: var(--grnl); color: var(--grn);
+  border: 1px solid var(--grn); border-radius: 4px; cursor: pointer; font-size: 12px; font-family: Arial;
+}
+.btn-approve:hover { background: var(--grn); color: white; }
+.btn-reject {
+  padding: 5px 14px; background: var(--redl); color: var(--red);
+  border: 1px solid var(--red); border-radius: 4px; cursor: pointer; font-size: 12px; font-family: Arial;
+}
+.btn-reject:hover { background: var(--red); color: white; }
+.btn-reason {
+  padding: 5px 14px; background: white; color: var(--muted);
+  border: 1px solid var(--border); border-radius: 4px; cursor: pointer; font-size: 12px; font-family: Arial;
+}
+
+/* ── Loading / empty states ── */
+.loading-state { text-align: center; padding: 40px; color: var(--muted); font-size: 13px; }
+.empty-state   { text-align: center; padding: 30px; color: #ccc; font-size: 13px; }
+.spinner {
+  display: inline-block; width: 20px; height: 20px;
+  border: 2px solid rgba(255,255,255,0.3); border-top-color: white;
+  border-radius: 50%; animation: spin 0.7s linear infinite;
+  vertical-align: middle; margin-right: 6px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.sov-bar  { height: 8px; background: #eee; border-radius: 4px; margin-top: 3px; overflow: hidden; }
+.sov-fill { height: 100%; background: var(--blue); border-radius: 4px; transition: width 0.6s; }
+
+.section-title {
+  font-size: 11px; font-weight: bold; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.8px;
+  margin: 18px 0 10px;
+}
+</style>
+</head>
+<body>
+
+<!-- ══ LOGIN SCREEN ══ -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <h1>🏠 SEO Platform</h1>
+    <p>Log in met je e-mailadres om toegang te krijgen tot het dashboard.</p>
+    <input type="email" id="email-input" placeholder="jouw@email.be" />
+    <button class="btn-primary" onclick="sendMagicLink()">Stuur inloglink</button>
+    <div id="auth-msg" class="auth-msg"></div>
+  </div>
+</div>
+
+<!-- ══ APP ══ -->
+<div id="app">
+  <div class="topbar">
+    <h1>📊 SEO Platform</h1>
+    <select class="site-select" id="site-select" onchange="onSiteChange()"></select>
+    <div class="topbar-right">
+      <span class="topbar-updated" id="updated-label"></span>
+      <button class="btn-sm" id="logout-btn" onclick="logout()">Uitloggen</button>
+    </div>
+  </div>
+
+  <div class="tabnav">
+    <div class="tab active" onclick="showTab('dashboard')">Dashboard</div>
+    <div class="tab" onclick="showTab('keywords')">Keywords</div>
+    <div class="tab" onclick="showTab('approvals')">Goedkeuringen <span id="pending-badge"></span></div>
+  </div>
+
+  <!-- ── Dashboard tab ── -->
+  <div class="content">
+    <div id="page-dashboard" class="page active">
+      <div class="kpi-grid" id="kpi-grid">
+        <div class="loading-state" style="grid-column:1/-1">
+          <span class="spinner" style="border-color:rgba(0,0,0,0.15);border-top-color:var(--blue)"></span> Laden…
+        </div>
+      </div>
+      <div class="row2">
+        <div class="card">
+          <h3>📈 Organisch Verkeer &amp; Traffic Waarde</h3>
+          <canvas id="trend-chart" height="120"></canvas>
+        </div>
+        <div class="card">
+          <h3>🏆 Concurrenten</h3>
+          <div id="comp-section"><div class="loading-state">Laden…</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Keywords tab ── -->
+    <div id="page-keywords" class="page">
+      <div class="card" style="margin-top:4px">
+        <h3>🔑 Top Keywords <span style="font-weight:normal;color:var(--muted)" id="kw-sync-time"></span></h3>
+        <div id="kw-section"><div class="loading-state">Laden…</div></div>
+      </div>
+    </div>
+
+    <!-- ── Approvals tab ── -->
+    <div id="page-approvals" class="page">
+      <div class="section-title">Openstaande goedkeuringen</div>
+      <div id="pending-section"><div class="empty-state">Geen openstaande wijzigingen</div></div>
+      <div class="section-title">Geschiedenis</div>
+      <div id="history-section"><div class="empty-state">Nog geen verwerkte wijzigingen</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══ CONFIG — vervang met jouw waarden ══════════════════════════
+const SUPABASE_URL  = 'https://iabrpwaekwjgmqxpnhqq.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhYnJwd2Fla3dqZ21xeHBuaHFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NDk0MzQsImV4cCI6MjA5NjMyNTQzNH0.44vRe6pAZjTIrAnbo_sTbt3SPOzBo6eLVuItlioMTLo';
+// ══════════════════════════════════════════════════════════════
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+let currentSiteId = null;
+let trendChart = null;
+let currentUser = null;
+
+// ── Helpers ──────────────────────────────────────────────────
+
+const fmt = (n, pre='', suf='') =>
+  (n == null || n === '') ? '—' : pre + Number(n).toLocaleString('nl-BE') + suf;
+
+const arrow = (cur, prev) => {
+  if (!cur || !prev || prev == 0) return '';
+  const p = ((cur - prev) / prev * 100).toFixed(1);
+  if (p > 1)  return `<span class="up">▲ ${p}%</span>`;
+  if (p < -1) return `<span class="dn">▼ ${Math.abs(p)}%</span>`;
+  return `<span class="fl">→ stabiel</span>`;
+};
+
+const posBadge = pos => {
+  const p = parseInt(pos);
+  if (!p) return '—';
+  const c = p <= 3 ? 'badge-g' : p <= 10 ? 'badge-o' : 'badge-r';
+  return `<span class="badge ${c}">#${p}</span>`;
+};
+
+const monthLabel = d => {
+  const m = ['','Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+  const dt = new Date(d);
+  return m[dt.getMonth()+1] + " '" + String(dt.getFullYear()).slice(2);
+};
+
+// ── Auth ─────────────────────────────────────────────────────
+
+async function sendMagicLink() {
+  const email = document.getElementById('email-input').value.trim();
+  const msg   = document.getElementById('auth-msg');
+  if (!email) { msg.textContent = 'Voer een e-mailadres in.'; msg.className = 'auth-msg err'; return; }
+
+  msg.textContent = 'Verzenden…'; msg.className = 'auth-msg';
+  const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.href } });
+  if (error) { msg.textContent = error.message; msg.className = 'auth-msg err'; }
+  else { msg.textContent = '✓ Controleer je inbox en klik de link.'; msg.className = 'auth-msg ok'; }
+}
+
+async function logout() {
+  await sb.auth.signOut();
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+}
+
+sb.auth.onAuthStateChange(async (event, session) => {
+  if (session?.user) {
+    currentUser = session.user;
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    await loadSites();
+  }
+});
+
+// ── Sites ─────────────────────────────────────────────────────
+
+async function loadSites() {
+  const { data } = await sb.from('sites').select('id,domain,name').eq('active', true).order('name');
+  const sel = document.getElementById('site-select');
+  sel.innerHTML = data.map(s => `<option value="${s.id}">${s.name} (${s.domain})</option>`).join('');
+  if (data.length) { currentSiteId = data[0].id; await loadAll(); }
+}
+
+async function onSiteChange() {
+  currentSiteId = document.getElementById('site-select').value;
+  await loadAll();
+}
+
+// ── Load all data ─────────────────────────────────────────────
+
+async function loadAll() {
+  await Promise.all([loadDashboard(), loadKeywords(), loadApprovals()]);
+}
+
+// ── Dashboard ─────────────────────────────────────────────────
+
+async function loadDashboard() {
+  const { data: metrics } = await sb
+    .from('metrics_monthly')
+    .select('*')
+    .eq('site_id', currentSiteId)
+    .order('month', { ascending: false })
+    .limit(24);
+
+  if (!metrics?.length) {
+    document.getElementById('kpi-grid').innerHTML =
+      '<div class="empty-state" style="grid-column:1/-1">Nog geen data. Voer eerst de sync uit.</div>';
+    return;
+  }
+
+  renderKPIs(metrics);
+  renderTrendChart(metrics);
+
+  const latest = new Date(metrics[0].month);
+  document.getElementById('updated-label').textContent =
+    'Data: ' + latest.toLocaleDateString('nl-BE', { month:'long', year:'numeric' });
+}
+
+function renderKPIs(metrics) {
+  const cur  = metrics[0];
+  const prev = metrics[1] || {};
+
+  const kpis = [
+    { label:'Traffic Waarde', val: fmt(cur.organic_cost,'€'), sub:'Equiv. Google Ads waarde/mnd',
+      trend: arrow(cur.organic_cost, prev.organic_cost), color:'var(--grn)' },
+    { label:'Organisch Verkeer', val: fmt(cur.organic_traffic), sub:'Geschatte bezoeken/mnd (SEMrush)',
+      trend: arrow(cur.organic_traffic, prev.organic_traffic), color:'var(--blue)' },
+    { label:'Organische Keywords', val: fmt(cur.organic_keywords), sub:'Keywords in Google top 100',
+      trend: arrow(cur.organic_keywords, prev.organic_keywords), color:'var(--org)' },
+    { label:'Betaald Verkeer', val: fmt(cur.adwords_traffic), sub:`${fmt(cur.adwords_keywords)} kw · €${fmt(cur.adwords_cost)}/mnd`,
+      trend:'', color:'var(--navy)' },
+  ];
+
+  document.getElementById('kpi-grid').innerHTML = kpis.map(k => `
+    <div class="kpi-card" style="border-top-color:${k.color}">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value" style="color:${k.color}">${k.val}</div>
+      <div class="kpi-sub">${k.sub}</div>
+      <div class="kpi-trend">${k.trend}</div>
+    </div>`).join('');
+}
+
+function renderTrendChart(metrics) {
+  const pts = metrics.slice(0, 13).reverse();
+  const labels  = pts.map(m => monthLabel(m.month));
+  const traffic = pts.map(m => m.organic_traffic || 0);
+  const value   = pts.map(m => m.organic_cost    || 0);
+
+  if (trendChart) trendChart.destroy();
+  trendChart = new Chart(document.getElementById('trend-chart').getContext('2d'), {
+    type: 'line',
+    data: { labels, datasets: [
+      { label:'Verkeer', data: traffic, borderColor:'#2E5496', backgroundColor:'rgba(46,84,150,0.07)',
+        tension:0.3, fill:true, yAxisID:'y', pointRadius:3 },
+      { label:'Waarde (€)', data: value, borderColor:'#375623', backgroundColor:'transparent',
+        tension:0.3, fill:false, yAxisID:'y1', borderDash:[5,3], pointRadius:3 },
+    ]},
+    options: {
+      responsive:true,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{ legend:{ labels:{ font:{ family:'Arial', size:11 }, boxWidth:18 } },
+        tooltip:{ callbacks:{ label: c => c.datasetIndex===1
+          ? ' €'+c.parsed.y.toLocaleString('nl-BE')
+          : ' '+c.parsed.y.toLocaleString('nl-BE') }}},
+      scales:{
+        y:  { position:'left',  ticks:{ font:{size:10}, callback: v => v>=1000 ? Math.round(v/1000)+'k':v }, grid:{color:'#f2f2f2'} },
+        y1: { position:'right', ticks:{ font:{size:10}, callback: v => '€'+(v>=1000?Math.round(v/1000)+'k':v) }, grid:{drawOnChartArea:false} },
+        x:  { ticks:{ font:{size:10}, maxRotation:40 }, grid:{color:'#f8f8f8'} },
+      }
+    }
+  });
+}
+
+// ── Keywords ──────────────────────────────────────────────────
+
+async function loadKeywords() {
+  const { data: kws } = await sb
+    .from('keywords_current')
+    .select('*')
+    .eq('site_id', currentSiteId)
+    .order('traffic_pct', { ascending: false });
+
+  const sec = document.getElementById('kw-section');
+  if (!kws?.length) { sec.innerHTML = '<div class="empty-state">Nog geen keywords. Voer de sync uit.</div>'; return; }
+
+  // latest sync time
+  const latestSync = kws[0]?.synced_at;
+  if (latestSync) {
+    document.getElementById('kw-sync-time').textContent =
+      '— ' + new Date(latestSync).toLocaleDateString('nl-BE', { day:'numeric', month:'short', year:'numeric' });
+  }
+
+  const rows = kws.map(k => {
+    const delta = k.prev_position && k.position
+      ? k.prev_position - k.position  // positive = improved
+      : 0;
+    const deltaHtml = delta > 0
+      ? `<span class="up" title="was #${k.prev_position}">▲${delta}</span>`
+      : delta < 0
+        ? `<span class="dn" title="was #${k.prev_position}">▼${Math.abs(delta)}</span>`
+        : '<span class="fl">—</span>';
+    const url = (k.url || '').replace('https://www.hypotheekwinkel.be','') || '/';
+    return `<tr>
+      <td>${k.keyword}</td>
+      <td style="text-align:center">${posBadge(k.position)}</td>
+      <td style="text-align:center">${deltaHtml}</td>
+      <td style="text-align:right">${fmt(k.search_volume)}</td>
+      <td style="text-align:right">${k.traffic_pct ? k.traffic_pct.toFixed(2)+'%' : '—'}</td>
+      <td style="color:#aaa;font-size:11px;max-width:180px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis" title="${url}">${url}</td>
+    </tr>`;
+  }).join('');
+
+  sec.innerHTML = `<table>
+    <thead><tr>
+      <th>Keyword</th>
+      <th style="text-align:center">Positie</th>
+      <th style="text-align:center">Δ</th>
+      <th style="text-align:right">Volume</th>
+      <th style="text-align:right">Traffic %</th>
+      <th>URL</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+// ── Approvals ─────────────────────────────────────────────────
+
+async function loadApprovals() {
+  const { data: changes } = await sb
+    .from('seo_changes')
+    .select('*')
+    .eq('site_id', currentSiteId)
+    .order('created_at', { ascending: false });
+
+  if (!changes) return;
+
+  const pending = changes.filter(c => c.status === 'pending');
+  const history = changes.filter(c => c.status !== 'pending');
+
+  // Badge
+  document.getElementById('pending-badge').textContent =
+    pending.length ? `(${pending.length})` : '';
+
+  renderChanges('pending-section', pending, true);
+  renderChanges('history-section', history, false);
+}
+
+const FIELD_LABELS = {
+  meta_title: 'Meta Title',
+  meta_description: 'Meta Description',
+  focus_keyword: 'Focus Keyword',
+};
+
+function renderChanges(elId, items, showActions) {
+  const el = document.getElementById(elId);
+  if (!items.length) { el.innerHTML = `<div class="empty-state">${showActions ? 'Geen openstaande wijzigingen' : 'Nog geen geschiedenis'}</div>`; return; }
+
+  el.innerHTML = items.map(c => {
+    const statusBadge = {
+      pending:  '<span class="badge badge-o">Wacht op goedkeuring</span>',
+      approved: '<span class="badge badge-g">Goedgekeurd</span>',
+      rejected: '<span class="badge badge-r">Afgewezen</span>',
+      applied:  '<span class="badge badge-b">Toegepast</span>',
+    }[c.status] || '';
+
+    const actions = showActions ? `
+      <div class="change-actions">
+        <button class="btn-approve" onclick="updateChange('${c.id}','approved')">✓ Goedkeuren</button>
+        <button class="btn-reject"  onclick="updateChange('${c.id}','rejected')">✗ Afwijzen</button>
+      </div>` : '';
+
+    return `<div class="change-card ${c.status}">
+      <div class="change-meta">
+        ${statusBadge} &nbsp;·&nbsp; ${new Date(c.created_at).toLocaleDateString('nl-BE')}
+        ${c.created_by ? '&nbsp;·&nbsp; door ' + c.created_by : ''}
+      </div>
+      <div class="change-field">${FIELD_LABELS[c.field] || c.field}</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">${c.page_url}</div>
+      <div class="change-diff">
+        <div class="diff-old"><div class="diff-label">Huidig</div>${c.old_value || '(leeg)'}</div>
+        <div class="diff-new"><div class="diff-label">Nieuw voorstel</div>${c.new_value}</div>
+      </div>
+      ${c.reason ? `<div style="font-size:11px;color:var(--muted)">Reden: ${c.reason}</div>` : ''}
+      ${actions}
+    </div>`;
+  }).join('');
+}
+
+async function updateChange(id, status) {
+  await sb.from('seo_changes').update({
+    status,
+    reviewed_by: currentUser?.email,
+    reviewed_at: new Date().toISOString(),
+  }).eq('id', id);
+  await loadApprovals();
+}
+
+// ── Tab navigation ────────────────────────────────────────────
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    const names = ['dashboard','keywords','approvals'];
+    t.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.page').forEach(p => {
+    p.classList.toggle('active', p.id === 'page-'+name);
+  });
+}
+
+// ── Enter key for login ───────────────────────────────────────
+document.getElementById('email-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendMagicLink();
+});
+</script>
+</body>
+</html>
